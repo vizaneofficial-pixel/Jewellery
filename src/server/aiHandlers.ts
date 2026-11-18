@@ -1,11 +1,11 @@
 import { GoogleGenAI, ThinkingLevel, Type, type Content } from '@google/genai';
 import type { AccountAiContext, AiMemoryAddition, PlannerSnapshot } from '../types/stall';
-import { applyAiToolAction } from '../utils/aiActions';
+import { applyAiToolAction } from '../utils/aiActions.js';
 import {
   buildVoiceCoachSystemInstruction,
   formatAccountContextBlock,
   STALL_TOOL_DECLARATIONS,
-} from './stallTools';
+} from './stallTools.js';
 
 function getAiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -571,5 +571,3 @@ export async function handleVoiceTurn(body: {
     memoryAdditions,
   };
 }
-
-
