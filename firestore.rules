@@ -45,13 +45,14 @@ service cloud.firestore {
         'businessName', 'preferredScale', 'createdAt', 'updatedAt'
       ]) &&
       data.keys().hasOnly([
-        'uid', 'email', 'displayName', 'photoURL',
+        'uid', 'email', 'displayName', 'preferredName', 'photoURL',
         'businessName', 'preferredScale', 'createdAt', 'updatedAt'
       ]) &&
       data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
       data.uid == userId && data.uid == request.auth.uid &&
       data.email is string && data.email.size() <= 254 &&
       data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+      (!('preferredName' in data) || (data.preferredName is string && data.preferredName.size() <= 80)) &&
       data.photoURL is string && data.photoURL.size() <= 512 &&
       data.businessName is string && data.businessName.size() <= 120 &&
       data.preferredScale is string && data.preferredScale.size() <= 60 &&
@@ -70,7 +71,8 @@ service cloud.firestore {
         'ownerId', 'eventName', 'expectedFootfall', 'budgetCap', 'minProfitFloor',
         'stallFee', 'maxPerCategory', 'minColoursRule', 'globalSellThrough',
         'activeTab', 'rules', 'categories', 'stallStock',
-        'selectedComboId', 'customQuantities', 'createdAt', 'updatedAt'
+        'selectedComboId', 'customQuantities', 'categoryGroups', 'activeGroupId',
+        'createdAt', 'updatedAt'
       ]) &&
       data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
       data.ownerId == userId && data.ownerId == request.auth.uid &&
@@ -83,7 +85,7 @@ service cloud.firestore {
       data.minColoursRule is number && data.minColoursRule >= 0 && data.minColoursRule <= 25 &&
       data.globalSellThrough is number && data.globalSellThrough >= 10 && data.globalSellThrough <= 100 &&
       data.activeTab is string && data.activeTab.size() <= 20 &&
-      data.activeTab in ['optimizer', 'calculator', 'strategies'] &&
+      data.activeTab in ['optimizer', 'calculator', 'strategies', 'overview'] &&
       data.rules is map &&
       data.rules.keys().hasAll(['allAtLeastOne', 'evenDistribution', 'beautyFirst', 'maxProfitFocus', 'safe90Mode']) &&
       data.rules.keys().hasOnly(['allAtLeastOne', 'evenDistribution', 'beautyFirst', 'maxProfitFocus', 'safe90Mode']) &&
@@ -98,6 +100,8 @@ service cloud.firestore {
       (data.stallStock.size() == 0 || data.stallStock[0] is map) &&
       (data.selectedComboId == null || (data.selectedComboId is string && data.selectedComboId.size() <= 128)) &&
       (data.customQuantities == null || (data.customQuantities is list && data.customQuantities.size() <= 25 && (data.customQuantities.size() == 0 || data.customQuantities[0] is number))) &&
+      (!('activeGroupId' in data) || (data.activeGroupId is string && data.activeGroupId.size() >= 1 && data.activeGroupId.size() <= 128)) &&
+      (!('categoryGroups' in data) || (data.categoryGroups is list && data.categoryGroups.size() >= 1 && data.categoryGroups.size() <= 20 && data.categoryGroups[0] is map)) &&
       data.createdAt is timestamp &&
       data.updatedAt is timestamp;
     }
@@ -137,8 +141,8 @@ service cloud.firestore {
         incoming().updatedAt == request.time && (
           // Action: Sync Google Auth identity fields
           incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'updatedAt']) ||
-          // Action: Update merchant business profile preferences
-          incoming().diff(existing()).affectedKeys().hasOnly(['businessName', 'preferredScale', 'updatedAt'])
+          // Action: Update merchant business profile & preferred name
+          incoming().diff(existing()).affectedKeys().hasOnly(['preferredName', 'businessName', 'preferredScale', 'updatedAt'])
         );
 
       allow delete: if false;
@@ -169,7 +173,8 @@ service cloud.firestore {
             'eventName', 'expectedFootfall', 'budgetCap', 'minProfitFloor',
             'stallFee', 'maxPerCategory', 'minColoursRule', 'globalSellThrough',
             'activeTab', 'rules', 'categories', 'stallStock',
-            'selectedComboId', 'customQuantities', 'updatedAt'
+            'selectedComboId', 'customQuantities', 'categoryGroups', 'activeGroupId',
+            'updatedAt'
           ]) &&
           hasParentUser(userId);
 

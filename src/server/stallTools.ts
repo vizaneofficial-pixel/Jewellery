@@ -95,7 +95,7 @@ export const STALL_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         },
         navigateToTab: {
           type: Type.STRING,
-          description: "Switch visible workspace tab: 'optimizer', 'calculator', or 'strategies'.",
+          description: "Switch visible workspace tab: 'optimizer', 'overview', 'calculator', or 'strategies'.",
         },
       },
     },
@@ -150,7 +150,7 @@ export const STALL_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         },
         navigateToTab: {
           type: Type.STRING,
-          description: "Switch visible workspace tab: 'optimizer', 'calculator', or 'strategies'.",
+          description: "Switch visible workspace tab: 'optimizer', 'overview', 'calculator', or 'strategies'.",
         },
       },
     },
@@ -167,7 +167,7 @@ export const STALL_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'save_ai_memory',
     description:
-      'Save a lasting merchant preference, brand detail, supplier pricing rule, bestseller note, or past event learning to the logged-in user account AI memory so future sessions remember it.',
+      'Save ONLY durable, useful merchant context under the logged-in user account: preferred product categories, planning preferences, price/margin sensitivity, profit goals, brand details, or explicitly confirmed facts. NEVER save raw chat transcripts or temporary chit-chat verbatim.',
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -197,10 +197,15 @@ export const STALL_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 
 export function formatAccountContextBlock(accountContext?: AccountAiContext): string {
   if (!accountContext) {
-    return 'Account Context: Guest session (remind user they can sign in with Google to save plans and AI memory across sessions if asked).';
+    return 'Account Context: Local preview session without signed-in account memory. Do not reference or fabricate personal account memory.';
   }
+  const preferredName =
+    accountContext.preferredName?.trim() ||
+    accountContext.displayName?.trim().split(/\s+/)[0] ||
+    'Merchant';
   const identityParts = [
-    accountContext.displayName ? `Merchant="${accountContext.displayName}"` : null,
+    `Preferred Name="${preferredName}"`,
+    accountContext.displayName ? `Account Name="${accountContext.displayName}"` : null,
     accountContext.businessName ? `Brand="${accountContext.businessName}"` : null,
     accountContext.preferredScale ? `Default Scale="${accountContext.preferredScale}"` : null,
   ].filter(Boolean);
@@ -210,7 +215,9 @@ export function formatAccountContextBlock(accountContext?: AccountAiContext): st
     .map((m) => `- [${m.category}] ${m.fact}`)
     .join('\n');
 
-  return `Signed-In Account Context (${identityParts.join(', ') || 'Authenticated Merchant'}):
+  return `Private Signed-In User Context (${identityParts.join(', ')}):
+Address this merchant naturally by their Preferred Name ("${preferredName}") when appropriate without overusing it.
+Saved durable preferences & facts for this user ONLY:
 ${memoryLines || 'No saved account memories yet.'}`;
 }
 
@@ -218,15 +225,27 @@ export function buildVoiceCoachSystemInstruction(
   snapshot?: PlannerSnapshot,
   accountContext?: AccountAiContext
 ): string {
+  const groupsSummary =
+    snapshot?.categoryGroups && snapshot.categoryGroups.length > 0
+      ? ` Category Portfolio=${JSON.stringify(
+          snapshot.categoryGroups.map((g) => ({
+            name: g.name,
+            budgetCap: g.budgetCap,
+            minProfitFloor: g.minProfitFloor,
+            itemsCount: g.categories.length,
+          }))
+        )}.`
+      : '';
+
   const stateContext = snapshot
-    ? `Current website state: Event="${snapshot.eventName}", Expected Footfall=${snapshot.expectedFootfall}, Wholesale Budget=₹${snapshot.budgetCap}, Profit Floor=₹${snapshot.minProfitFloor}, Stall/Event Fee=₹${snapshot.stallFee}, Active Tab="${snapshot.activeTab}", Categories=${JSON.stringify(
+    ? `Current website state: Event="${snapshot.eventName}", Expected Footfall=${snapshot.expectedFootfall}, Active Category Budget=₹${snapshot.budgetCap}, Profit Floor=₹${snapshot.minProfitFloor}, Stall/Event Fee=₹${snapshot.stallFee}, Active Tab="${snapshot.activeTab}", Categories=${JSON.stringify(
         snapshot.categories.map((c) => ({
           name: c.name,
           cost: c.cost,
           price: c.price,
           beauty: c.beauty,
         }))
-      )}, Rules=${JSON.stringify(snapshot.rules)}.`
+      )}, Rules=${JSON.stringify(snapshot.rules)}.${groupsSummary}`
     : 'No live state synced yet.';
 
   const memoryBlock = formatAccountContextBlock(accountContext);
@@ -238,8 +257,8 @@ ${memoryBlock}
 ${stateContext}
 
 CRITICAL RULES:
-1. Whenever the merchant reads out items, beauty scores, wholesale costs, selling prices, stock quantities, budgets, event fees, crowd footfall, or asks you to build/adjust a plan, ALWAYS call 'configure_planner' or 'manage_inventory_stock' immediately so the live website updates right in front of them!
-2. Use the merchant's Signed-In Account Context & saved memories proactively. Whenever the merchant mentions a lasting business preference, markup rule, target audience, supplier cost rule, or says "remember this", call 'save_ai_memory' to store it to their account!
+1. Whenever the merchant reads out items, beauty scores, wholesale costs, selling prices, stock quantities, budgets, event fees, crowd footfall, or asks you to build/adjust a plan or switch tabs (including 'overview'), ALWAYS call 'configure_planner' or 'manage_inventory_stock' immediately so the live website updates right in front of them!
+2. Use the merchant's Preferred Name naturally and apply their saved private memories proactively. Only call 'save_ai_memory' for durable preferences, product categories, pricing/margin rules, event goals, or explicitly confirmed facts—never save raw conversational transcripts.
 3. Wait for the tool response and ALWAYS dictate the EXACT recalculated figures returned by the tool (never guess math in your head): top recommended mix breakdown, wholesale cost, expected revenue, net profit, weighted beauty score, stall fee coverage / break-even units, plus 1-2 crisp pricing or bundling suggestions.
 4. Keep spoken replies concise, natural, and crisp (3-5 short sentences) with ZERO markdown, asterisks, or bullet symbols so voice playback sounds completely natural.`;
 }

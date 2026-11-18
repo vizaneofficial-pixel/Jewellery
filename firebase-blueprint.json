@@ -23,6 +23,11 @@
           "maxLength": 120,
           "description": "Merchant display name."
         },
+        "preferredName": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Preferred name used by AI Coach and personalized greetings."
+        },
         "photoURL": {
           "type": "string",
           "maxLength": 512,
@@ -107,7 +112,7 @@
         },
         "activeTab": {
           "type": "string",
-          "enum": ["optimizer", "calculator", "strategies"],
+          "enum": ["optimizer", "calculator", "strategies", "overview"],
           "description": "Last active workspace tab."
         },
         "rules": {
@@ -130,6 +135,16 @@
         "customQuantities": {
           "type": "array",
           "description": "Custom manually adjusted quantities or null."
+        },
+        "categoryGroups": {
+          "type": "array",
+          "description": "Diversified multi-category planner groups with per-category budgets, items, rules, and selected mixes (1-20 items)."
+        },
+        "activeGroupId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Currently active category group identifier."
         },
         "createdAt": {
           "type": "string",

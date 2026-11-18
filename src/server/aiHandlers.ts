@@ -99,7 +99,7 @@ export async function handleParseCommand(body: {
 ${formatAccountContextBlock(body.accountContext)}
 Current categories: ${JSON.stringify(body.categories)}.
 Current settings: ${JSON.stringify(body.settings)}.
-Convert the user's raw note, dictated items, supplier quote, sale scale change, or rule request into structured updates. If the user states a lasting preference or asks to remember something, also populate memoryNotes. Return ONLY fields that should be updated or added, plus a concise 1-sentence summaryMessage.`;
+Convert the user's raw note, dictated items, supplier quote, sale scale change, or rule request into structured updates. Only populate memoryNotes when the user states a durable preference, product category focus, price sensitivity, goal, or explicitly confirmed fact to remember (never store raw command transcripts). Return ONLY fields that should be updated or added, plus a concise 1-sentence summaryMessage.`;
 
   try {
     const response = await withRetry(() =>
@@ -254,7 +254,7 @@ export async function handleCfoAudit(body: {
     'en-IN'
   )} expected footfall).
 ${formatAccountContextBlock(body.accountContext)}
-Deliver a crisp, numbers-backed audit in 4 short bullet points covering: (1) Margin & ROI winner to spotlight, (2) Dead-stock / over-stocked risk, (3) Bundle pricing move to lift average bill value, and (4) Break-even pacing target across sale hours. Tailor recommendations to the merchant's remembered brand/preferences when present. Keep total response under 150 words, crisp and scannable.`;
+Deliver a crisp, numbers-backed audit in 4 short bullet points covering: (1) Margin & ROI winner to spotlight, (2) Dead-stock / over-stocked risk, (3) Bundle pricing move to lift average bill value, and (4) Break-even pacing target across sale hours. Address the merchant naturally by their Preferred Name if provided and tailor recommendations to their saved preferences. Keep total response under 150 words, crisp and scannable.`;
 
   try {
     const response = await withRetry(() =>
@@ -300,7 +300,7 @@ export async function handleStrategyPitch(body: {
   )} footfall)\nActive Mix: ${body.activeMixSummary}\nStall Fee: ₹${body.stallFee}\nMerchant Question: ${body.question}`;
   const sysInstr = `You are a top Indian retail merchandiser and sales trainer advising for "${eventLabel}".
 ${formatAccountContextBlock(body.accountContext)}
-Provide a sharp, ready-to-use 3-step selling script, bundle price anchor, and objection-handling line tailored to the merchant inventory, sale scale, and account context. Keep it under 120 words and scannable.`;
+Provide a sharp, ready-to-use 3-step selling script, bundle price anchor, and objection-handling line tailored to the merchant inventory, sale scale, and private account context (using their Preferred Name naturally if provided). Keep it under 120 words and scannable.`;
 
   try {
     const response = await withRetry(() =>

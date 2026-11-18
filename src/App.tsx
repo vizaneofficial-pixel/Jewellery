@@ -3,12 +3,15 @@ import { AccountMemoryDrawer } from './components/AccountMemoryDrawer';
 import { AiCommandBar } from './components/AiCommandBar';
 import { CalculatorTab } from './components/CalculatorTab';
 import { Header } from './components/Header';
+import { LoginScreen } from './components/LoginScreen';
 import { OptimizerTab } from './components/OptimizerTab';
 import { OverviewTab } from './components/OverviewTab';
 import { StrategiesTab } from './components/StrategiesTab';
 import { VoiceCoachModal } from './components/VoiceCoachModal';
 import { useAuth } from './context/AuthContext';
+import { Loader2 } from 'lucide-react';
 import {
+  CATEGORY_TEMPLATES,
   EXTRA_CATEGORY_STYLES,
   GROUP_ACCENT_COLORS,
   INITIAL_CATEGORIES,
@@ -71,16 +74,26 @@ export default function App() {
   // Floating Voice Coach Co-Pilot & Account Memory Drawer
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
+  const [guestMode, setGuestMode] = useState(false);
 
   const {
+    authReady,
+    isFirebaseConfigured,
+    configError,
     user,
+    profile,
     accountContext,
     syncStatus,
     authError,
+    signingIn,
+    signInWithGoogle,
+    logout,
+    retryCloudSync,
     clearAuthError,
     addMemoriesBatch,
     syncWorkspace,
     registerWorkspaceHydrator,
+    registerWorkspaceResetter,
   } = useAuth();
   const skipNextCloudSaveRef = useRef(true);
   const prevUidRef = useRef<string | null>(null);
@@ -91,9 +104,26 @@ export default function App() {
     [categoryGroups]
   );
 
+  const otherEventCostsTotal = useMemo(
+    () =>
+      stallStock.reduce(
+        (sum, item) =>
+          item.itemType === 'event_cost'
+            ? sum + Math.max(0, item.cost) * Math.max(0, item.qty)
+            : sum,
+        0
+      ),
+    [stallStock]
+  );
+
   const overviewTotals = useMemo(
-    () => computeDiversifiedOverviewTotals(resolvedGroups),
-    [resolvedGroups]
+    () =>
+      computeDiversifiedOverviewTotals(
+        resolvedGroups,
+        stallFee + otherEventCostsTotal,
+        expectedFootfall
+      ),
+    [resolvedGroups, stallFee, otherEventCostsTotal, expectedFootfall]
   );
 
   const activeResolved = useMemo(
@@ -123,77 +153,84 @@ export default function App() {
     );
   }, [resolvedGroups, globalSellThrough]);
 
-  const addCategoryGroup = () => {
+  const createCategoryGroup = (templateId = 'custom', customName?: string) => {
     const nextIdx = categoryGroups.length + 1;
     const accent =
       GROUP_ACCENT_COLORS[(nextIdx - 1) % GROUP_ACCENT_COLORS.length];
     const newId = `grp_${Date.now()}`;
+    const tpl =
+      CATEGORY_TEMPLATES.find((t) => t.id === templateId) || CATEGORY_TEMPLATES[0];
+    const stylePool = [
+      ...INITIAL_CATEGORIES.map(({ barColor, textClass, bgClass }) => ({
+        barColor,
+        textClass,
+        bgClass,
+      })),
+      ...EXTRA_CATEGORY_STYLES,
+    ];
+
+    const baseName = customName?.trim() || tpl.name;
+    const existsSame = categoryGroups.some(
+      (g) => g.name.trim().toLowerCase() === baseName.toLowerCase()
+    );
+    const resolvedName = existsSame ? `${baseName} ${nextIdx}` : baseName;
+
     const newGroup: StockCategoryGroup = {
       id: newId,
-      name: `Category ${nextIdx}`,
+      name: resolvedName,
       accentColor: accent,
-      budgetCap: 2500,
-      minProfitFloor: 2600,
+      budgetCap: tpl.budgetCap,
+      minProfitFloor: tpl.minProfitFloor,
       maxPerCategory: 6,
-      minColoursRule: 1,
+      minColoursRule: 0,
+      conservativeSellThroughPct: 90,
       rules: {
         allAtLeastOne: true,
-        evenDistribution: true,
+        evenDistribution: false,
         beautyFirst: false,
         maxProfitFocus: false,
         safe90Mode: false,
       },
-      categories: [
-        {
-          id: `${newId}_1`,
-          name: 'Hero Piece',
-          shortName: 'Hero',
-          cost: 220,
-          price: 499,
-          beauty: 9.2,
-          barColor: '#fbbf24',
-          textClass: 'text-amber-300',
-          bgClass: 'bg-amber-500/12 border-amber-500/35',
-        },
-        {
-          id: `${newId}_2`,
-          name: 'Signature Set',
-          shortName: 'Signature',
-          cost: 160,
-          price: 379,
-          beauty: 8.6,
-          barColor: '#06b6d4',
-          textClass: 'text-cyan-300',
-          bgClass: 'bg-cyan-500/12 border-cyan-500/35',
-        },
-        {
-          id: `${newId}_3`,
-          name: 'Daily Classic',
-          shortName: 'Classic',
-          cost: 120,
-          price: 279,
-          beauty: 8.0,
-          barColor: '#10b981',
-          textClass: 'text-emerald-300',
-          bgClass: 'bg-emerald-500/12 border-emerald-500/35',
-        },
-        {
-          id: `${newId}_4`,
-          name: 'Impulse Add-On',
-          shortName: 'Impulse',
-          cost: 80,
-          price: 199,
-          beauty: 7.5,
-          barColor: '#ec4899',
-          textClass: 'text-pink-300',
-          bgClass: 'bg-pink-500/12 border-pink-500/35',
-        },
-      ],
+      categories: tpl.items.map((item, idx) => ({
+        id: `${newId}_${idx + 1}`,
+        name: item.name,
+        shortName:
+          item.name.split(/[\s/]+/).filter(Boolean).slice(0, 2).join(' ') || item.name,
+        cost: item.cost,
+        price: item.price,
+        beauty: item.beauty,
+        ...stylePool[idx % stylePool.length],
+      })),
       selectedComboId: 'c_1',
       customQuantities: null,
     };
 
     setCategoryGroups((prev) => [...prev, newGroup]);
+    setActiveGroupId(newId);
+    setActiveTab('optimizer');
+    setShowItemEditor(true);
+  };
+
+  const duplicateCategoryGroup = (groupId: string) => {
+    const source = categoryGroups.find((g) => g.id === groupId);
+    if (!source) return;
+    const nextIdx = categoryGroups.length + 1;
+    const accent =
+      GROUP_ACCENT_COLORS[(nextIdx - 1) % GROUP_ACCENT_COLORS.length];
+    const newId = `grp_${Date.now()}`;
+    const copyGroup: StockCategoryGroup = {
+      ...source,
+      id: newId,
+      name: `${source.name} Copy`.slice(0, 60),
+      accentColor: accent,
+      rules: { ...source.rules },
+      categories: source.categories.map((c, idx) => ({
+        ...c,
+        id: `${newId}_item_${idx + 1}`,
+      })),
+      customQuantities: source.customQuantities ? [...source.customQuantities] : null,
+    };
+    setCategoryGroups((prev) => [...prev, copyGroup]);
     setActiveGroupId(newId);
     setActiveTab('optimizer');
   };
@@ -238,23 +275,22 @@ export default function App() {
     });
   };
 
-  const updateCat = (
-    id: string,
-    field: 'name' | 'cost' | 'price' | 'beauty',
-    val: string
-  ) => {
+  const updateCatFields = (id: string, patch: Partial<BangleCategory>) => {
     updateActiveGroup((g) => ({
       ...g,
       categories: g.categories.map((c) => {
         if (c.id !== id) return c;
-        if (field === 'name') {
-          return { ...c, name: val, shortName: val.split(' ')[0] || val };
+        const next: BangleCategory = { ...c, ...patch };
+        if (typeof next.beauty === 'number') {
+          next.beauty = Math.min(10, Math.max(1, next.beauty));
         }
-        const num = Math.max(0, Number(val) || 0);
-        return {
-          ...c,
-          [field]: field === 'beauty' ? Math.min(10, Math.max(1, num)) : num,
-        };
+        if (typeof next.cost === 'number') {
+          next.cost = Math.max(0, next.cost);
+        }
+        if (typeof next.price === 'number') {
+          next.price = Math.max(0, next.price);
+        }
+        return next;
       }),
     }));
   };
@@ -274,19 +310,20 @@ export default function App() {
             id: `item_${Date.now()}`,
             name: `Item ${nextIdx}`,
             shortName: `Item ${nextIdx}`,
-            cost: 150,
-            price: 349,
+            cost: 120,
+            price: 260,
             beauty: 8.0,
             ...style,
           },
         ],
+        customQuantities: null,
       };
     });
   };
 
   const removeCat = (id: string) => {
     updateActiveGroup((g) => {
-      if (g.categories.length <= 2) return g;
+      if (g.categories.length <= 1) return g;
       return {
         ...g,
         categories: g.categories.filter((c) => c.id !== id),
@@ -322,7 +359,8 @@ export default function App() {
     setAiFeedback(`Updated to ${preset.label}`);
   };
 
-  const resetAll = () => {
+  const resetAll = useCallback(() => {
+    setActiveTab('optimizer');
     setEventName('Grand Casa, Siliguri');
     setExpectedFootfall(10000);
     setStallFee(9000);
@@ -336,11 +374,13 @@ export default function App() {
       )
     );
     setGlobalSellThrough(90);
+    setShowItemEditor(false);
+    setAiInput('');
     setAiError(null);
     setAiAuditReport(null);
     setAiAuditError(null);
     setAiFeedback('');
-  };
+  }, []);
 
   const relaxConstraints = () => {
     updateActiveGroup((g) => ({
@@ -442,7 +482,14 @@ export default function App() {
       skipNextCloudSaveRef.current = true;
       applyAiPlannerSnapshot(saved, []);
     });
-  }, [registerWorkspaceHydrator, applyAiPlannerSnapshot]);
+    registerWorkspaceResetter(() => {
+      skipNextCloudSaveRef.current = true;
+      setGuestMode(false);
+      setVoiceModalOpen(false);
+      setAccountDrawerOpen(false);
+      resetAll();
+    });
+  }, [registerWorkspaceHydrator, registerWorkspaceResetter, applyAiPlannerSnapshot, resetAll]);
 
   // Debounced cloud sync whenever plannerSnapshot changes while signed in
   useEffect(() => {
@@ -819,11 +866,19 @@ export default function App() {
     }
   };
 
-  // Total Stall stock handlers
+  // Total Stall stock & event cost handlers
   const applyGlobalSellThrough = (pct: number) => {
     setGlobalSellThrough(pct);
     setStallStock((prev) =>
-      prev.map((item) => ({ ...item, sellThrough: pct }))
+      prev.map((item) =>
+        item.itemType === 'event_cost'
+          ? item
+          : {
+              ...item,
+              sellThrough: pct,
+              ...(item.isSyncedBundle ? { sellThroughManual: true } : {}),
+            }
+      )
     );
   };
 
@@ -841,6 +896,9 @@ export default function App() {
                 field === 'name' || field === 'category'
                   ? val
                   : Math.max(0, Number(val) || 0),
+              ...(field === 'sellThrough' && item.isSyncedBundle
+                ? { sellThroughManual: true }
+                : {}),
             }
           : item
       )
@@ -859,12 +917,59 @@ export default function App() {
         qty: 20,
         sellThrough: globalSellThrough,
         isSyncedBundle: false,
+        itemType: 'stock',
       },
     ]);
   };
 
   const removeStockItem = (id: string) => {
     setStallStock((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const addEventCost = (name = 'Display / Packaging', amount = 500) => {
+    setStallStock((prev) => [
+      ...prev,
+      {
+        id: `exp_${Date.now()}`,
+        name,
+        category: 'Event Cost',
+        cost: Math.max(0, amount),
+        price: 0,
+        qty: 1,
+        sellThrough: 0,
+        isSyncedBundle: false,
+        itemType: 'event_cost',
+      },
+    ]);
+  };
+
+  const updateEventCost = (id: string, field: 'name' | 'cost', val: string) => {
+    setStallStock((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              [field]: field === 'name' ? val : Math.max(0, Number(val) || 0),
+            }
+          : item
+      )
+    );
+  };
+
+  const resetSyncedBundles = () => {
+    setStallStock((prev) => {
+      const cleaned = prev.map((item) => {
+        if (!item.isSyncedBundle) return item;
+        const copy: StallStockItem = { ...item, qty: 1 };
+        delete copy.sellThroughManual;
+        return copy;
+      });
+      return syncCategoryGroupsToStallStock(
+        resolvedGroups,
+        cleaned,
+        globalSellThrough
+      );
+    });
   };
 
   const runAiCfoAudit = async () => {
@@ -921,6 +1026,38 @@ export default function App() {
     )
     .join(' | ');
 
+  if (!authReady || (user && !profile && syncStatus === 'loading')) {
+    return (
+      <div className="min-h-screen bg-[#090D16] text-slate-100 flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
+          <div className="font-display text-sm font-bold text-white">StallIQ Pro</div>
+          <p className="text-xs text-slate-400">
+            {user ? 'Loading your private workspace...' : 'Checking authentication...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if ((!user && !guestMode) || (user && !profile && !guestMode)) {
+    return (
+      <LoginScreen
+        user={user}
+        isFirebaseConfigured={isFirebaseConfigured}
+        configError={configError}
+        authError={authError}
+        signingIn={signingIn}
+        syncingWorkspace={syncStatus === 'loading'}
+        onSignInWithGoogle={signInWithGoogle}
+        onContinueAsGuest={() => setGuestMode(true)}
+        onRetrySync={retryCloudSync}
+        onSignOut={logout}
+        onClearError={clearAuthError}
+      />
+    );
+  }
+
   return (
     <div
       id="top"
@@ -942,19 +1079,31 @@ export default function App() {
         onResetAll={resetAll}
         onOpenVoiceCoach={() => setVoiceModalOpen((prev) => !prev)}
         onOpenAccountDrawer={() => setAccountDrawerOpen(true)}
+        onOpenLoginScreen={() => setGuestMode(false)}
       />
 
       <main className="max-w-7xl mx-auto px-4 lg:px-8 pt-4 space-y-4">
         {authError && (
-          <div className="bg-rose-950/50 border border-rose-500/40 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-rose-200">
+          <div className="bg-rose-950/50 border border-rose-500/40 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-200">
             <span>{authError}</span>
-            <button
-              type="button"
-              onClick={clearAuthError}
-              className="text-rose-300 hover:text-white font-semibold shrink-0"
-            >
-              Dismiss
-            </button>
+            <div className="flex items-center gap-3 shrink-0">
+              {!user && (
+                <button
+                  type="button"
+                  onClick={() => setGuestMode(false)}
+                  className="text-amber-300 hover:text-white font-semibold underline"
+                >
+                  Open Sign-In Screen
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={clearAuthError}
+                className="text-rose-300 hover:text-white font-semibold"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
@@ -975,7 +1124,8 @@ export default function App() {
             resolvedGroups={resolvedGroups}
             activeGroupId={activeGroup.id}
             onSelectGroup={(id) => setActiveGroupId(id)}
-            onAddGroup={addCategoryGroup}
+            onCreateGroup={createCategoryGroup}
+            onDuplicateGroup={duplicateCategoryGroup}
             onRemoveGroup={removeCategoryGroup}
             onRenameGroup={renameCategoryGroup}
             categories={activeGroup.categories}
@@ -986,10 +1136,11 @@ export default function App() {
             minProfitFloor={activeGroup.minProfitFloor}
             stallFee={stallFee}
             maxPerCategory={activeGroup.maxPerCategory}
+            conservativeSellThroughPct={activeGroup.conservativeSellThroughPct ?? 90}
             copied={copied}
             showItemEditor={showItemEditor}
             onToggleItemEditor={() => setShowItemEditor((prev) => !prev)}
-            onUpdateCat={updateCat}
+            onUpdateCatFields={updateCatFields}
             onAddCat={addCat}
             onRemoveCat={removeCat}
             onToggleRule={toggleRule}
@@ -1001,6 +1152,9 @@ export default function App() {
             }
             onMaxPerCategoryChange={(val) =>
               updateActiveGroup((g) => ({ ...g, maxPerCategory: val }))
+            }
+            onConservativeSellThroughChange={(pct) =>
+              updateActiveGroup((g) => ({ ...g, conservativeSellThroughPct: pct }))
             }
             onSelectCombo={(id) =>
               updateActiveGroup((g) => ({
@@ -1025,12 +1179,18 @@ export default function App() {
             resolvedGroups={resolvedGroups}
             overviewTotals={overviewTotals}
             stallFee={stallFee}
+            expectedFootfall={expectedFootfall}
+            eventCostRows={stallTotals.eventCostRows}
+            onStallFeeChange={setStallFee}
+            onAddEventCost={addEventCost}
+            onUpdateEventCost={updateEventCost}
+            onRemoveEventCost={removeStockItem}
             onSelectGroupCombo={selectGroupCombo}
             onEditCategoryGroup={(groupId) => {
               setActiveGroupId(groupId);
               setActiveTab('optimizer');
             }}
-            onAddCategoryGroup={addCategoryGroup}
+            onAddCategoryGroup={() => createCategoryGroup('custom')}
             onTransferToCfo={() => {
               setStallStock((prev) =>
                 syncCategoryGroupsToStallStock(
@@ -1048,10 +1208,13 @@ export default function App() {
           <CalculatorTab
             eventName={eventName}
             expectedFootfall={expectedFootfall}
-            activeCombo={activeCombo}
             stallTotals={stallTotals}
             stallFee={stallFee}
             globalSellThrough={globalSellThrough}
+            onStallFeeChange={setStallFee}
+            onAddEventCost={addEventCost}
+            onUpdateEventCost={updateEventCost}
+            onRemoveEventCost={removeStockItem}
             onApplyGlobalSellThrough={applyGlobalSellThrough}
             onUpdateStockItem={updateStockItem}
             onAddStockItem={addBlankStockItem}
@@ -1059,6 +1222,7 @@ export default function App() {
               setStallStock((prev) => [...prev, ...items])
             }
             onRemoveStockItem={removeStockItem}
+            onResetSyncedBundles={resetSyncedBundles}
             aiAuditLoading={aiAuditLoading}
             aiAuditReport={aiAuditReport}
             aiAuditError={aiAuditError}

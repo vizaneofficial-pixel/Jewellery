@@ -14,6 +14,8 @@ import {
   applyCustomQuantities,
   calculateStallTotals,
   generateBangleCombinations,
+  resolveCategoryGroups,
+  syncCategoryGroupsToStallStock,
 } from './optimizer';
 
 const VALID_MEMORY_CATEGORIES = new Set<AiMemoryCategory>([
@@ -121,24 +123,53 @@ function finalizeSnapshot(
         )
       : baseCombo;
 
-  const syncedStock = activeCombo
-    ? candidate.stallStock.map((item) =>
-        item.isSyncedBundle
-          ? {
-              ...item,
-              name: `Selected Bangle Mix (${activeCombo.pieces} pcs)`,
-              cost: activeCombo.cost,
-              price: activeCombo.rev100,
-              unitPieces: activeCombo.pieces,
-            }
-          : item
-      )
-    : candidate.stallStock;
+  const nextSelectedComboId = baseCombo ? baseCombo.id : null;
+
+  let nextCategoryGroups = candidate.categoryGroups;
+  let syncedStock = candidate.stallStock;
+
+  if (Array.isArray(candidate.categoryGroups) && candidate.categoryGroups.length > 0) {
+    const targetGroupId = candidate.activeGroupId || candidate.categoryGroups[0].id;
+    nextCategoryGroups = candidate.categoryGroups.map((g) =>
+      g.id === targetGroupId
+        ? {
+            ...g,
+            budgetCap: candidate.budgetCap,
+            minProfitFloor: candidate.minProfitFloor,
+            maxPerCategory: candidate.maxPerCategory,
+            minColoursRule: candidate.minColoursRule,
+            rules: candidate.rules,
+            categories: candidate.categories,
+            selectedComboId: nextSelectedComboId,
+            customQuantities: candidate.customQuantities,
+          }
+        : g
+    );
+    const resolved = resolveCategoryGroups(nextCategoryGroups);
+    syncedStock = syncCategoryGroupsToStallStock(
+      resolved,
+      candidate.stallStock,
+      candidate.globalSellThrough
+    );
+  } else if (activeCombo) {
+    syncedStock = candidate.stallStock.map((item) =>
+      item.isSyncedBundle
+        ? {
+            ...item,
+            name: `Selected Bangle Mix (${activeCombo.pieces} pcs)`,
+            cost: activeCombo.cost,
+            price: activeCombo.rev100,
+            unitPieces: activeCombo.pieces,
+          }
+        : item
+    );
+  }
 
   const nextState: PlannerSnapshot = {
     ...candidate,
-    selectedComboId: baseCombo ? baseCombo.id : null,
+    selectedComboId: nextSelectedComboId,
     stallStock: syncedStock,
+    ...(nextCategoryGroups ? { categoryGroups: nextCategoryGroups } : {}),
   };
 
   const stallTotals = calculateStallTotals(
@@ -172,6 +203,7 @@ function finalizeSnapshot(
       savedMemories: memoryAdditions,
       accountProfile: accountContext
         ? {
+            preferredName: accountContext.preferredName || accountContext.displayName,
             merchantName: accountContext.displayName,
             businessName: accountContext.businessName,
             rememberedFacts: accountContext.memories.slice(0, 20),
@@ -259,6 +291,14 @@ export function applyAiToolAction(
     categories: snapshot.categories.map((c) => ({ ...c })),
     stallStock: snapshot.stallStock.map((s) => ({ ...s })),
     customQuantities: snapshot.customQuantities ? [...snapshot.customQuantities] : null,
+    categoryGroups: snapshot.categoryGroups
+      ? snapshot.categoryGroups.map((g) => ({
+          ...g,
+          rules: { ...g.rules },
+          categories: g.categories.map((c) => ({ ...c })),
+          customQuantities: g.customQuantities ? [...g.customQuantities] : null,
+        }))
+      : undefined,
   };
 
   if (toolName === 'configure_planner') {
@@ -472,17 +512,20 @@ export function applyAiToolAction(
 
     if (
       args.navigateToTab === 'optimizer' ||
+      args.navigateToTab === 'overview' ||
       args.navigateToTab === 'calculator' ||
       args.navigateToTab === 'strategies'
     ) {
-      next.activeTab = args.navigateToTab;
+      next.activeTab = args.navigateToTab as AppTab;
       changes.push(`Tab → ${args.navigateToTab}`);
     }
 
     return finalizeSnapshot(
       next,
       changes,
-      typeof args.selectComboRank === 'number' ? args.selectComboRank : undefined
+      typeof args.selectComboRank === 'number' ? args.selectComboRank : undefined,
+      [],
+      accountContext
     );
   }
 
@@ -591,15 +634,16 @@ export function applyAiToolAction(
 
     if (
       args.navigateToTab === 'optimizer' ||
+      args.navigateToTab === 'overview' ||
       args.navigateToTab === 'calculator' ||
       args.navigateToTab === 'strategies'
     ) {
-      next.activeTab = args.navigateToTab;
+      next.activeTab = args.navigateToTab as AppTab;
       changes.push(`Tab → ${args.navigateToTab}`);
     }
 
-    return finalizeSnapshot(next, changes);
+    return finalizeSnapshot(next, changes, undefined, [], accountContext);
   }
 
-  return finalizeSnapshot(next, changes);
+  return finalizeSnapshot(next, changes, undefined, [], accountContext);
 }

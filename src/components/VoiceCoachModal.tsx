@@ -299,13 +299,18 @@ export function VoiceCoachModal({
       setMode('serverless');
       setStatus('live');
       setErrorMsg(null);
+      const greetingName =
+        accountContextRef.current?.preferredName ||
+        accountContextRef.current?.displayName?.split(' ')[0] ||
+        '';
+      const namePrefix = greetingName ? `Hi ${greetingName} — ` : '';
       setMessages([
         {
           id: 'serverless_ready',
           role: 'coach',
           text: accountContextRef.current?.memories?.length
-            ? `Voice Coach ready with your saved account memory (${accountContextRef.current.memories.length} notes). Read out items, beauty scores, or ask anything.`
-            : 'Voice Coach ready (Audio + AI Plan Control). Read out items, beauty scores, costs & budget—I will build your plan live.',
+            ? `${namePrefix}Voice Coach ready with your private account memory (${accountContextRef.current.memories.length} notes). Read out items, beauty scores, or ask anything.`
+            : `${namePrefix}Voice Coach ready (Audio + AI Plan Control). Read out items, beauty scores, costs & budget—I will build your plan live.`,
         },
       ]);
     };
@@ -350,13 +355,18 @@ export function VoiceCoachModal({
                 accountContext: accountContextRef.current || null,
               })
             );
+            const liveName =
+              accountContextRef.current?.preferredName ||
+              accountContextRef.current?.displayName?.split(' ')[0] ||
+              '';
+            const livePrefix = liveName ? `Hi ${liveName} — ` : '';
             setMessages([
               {
                 id: `r_${Date.now()}`,
                 role: 'coach',
                 text: accountContextRef.current?.memories?.length
-                  ? `Live Voice Coach ready with ${accountContextRef.current.memories.length} remembered account note(s). Read out your items, beauty scores & budget.`
-                  : 'Live Voice Coach ready. Read out your items, beauty scores, costs & budget—watch the site build your plan live.',
+                  ? `${livePrefix}Live Voice Coach ready with ${accountContextRef.current.memories.length} remembered account note(s). Read out your items, beauty scores & budget.`
+                  : `${livePrefix}Live Voice Coach ready. Read out your items, beauty scores, costs & budget—watch the site build your plan live.`,
               },
             ]);
           }

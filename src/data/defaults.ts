@@ -279,7 +279,87 @@ export const EXTRA_CATEGORY_STYLES = [
   { barColor: '#3b82f6', textClass: 'text-blue-300', bgClass: 'bg-blue-500/12 border-blue-500/35' },
   { barColor: '#f43f5e', textClass: 'text-rose-300', bgClass: 'bg-rose-500/12 border-rose-500/35' },
   { barColor: '#a855f7', textClass: 'text-purple-300', bgClass: 'bg-purple-500/12 border-purple-500/35' },
-  { barColor: '#14b8a6', textClass: 'text-teal-300', bgClass: 'bg-teal-500/35' },
+  { barColor: '#14b8a6', textClass: 'text-teal-300', bgClass: 'bg-teal-500/12 border-teal-500/35' },
+];
+
+export interface CategoryTemplate {
+  id: string;
+  label: string;
+  name: string;
+  budgetCap: number;
+  minProfitFloor: number;
+  items: Array<{
+    name: string;
+    cost: number;
+    price: number;
+    beauty: number;
+  }>;
+}
+
+export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
+  {
+    id: 'custom',
+    label: 'Blank Custom',
+    name: 'Custom Stock',
+    budgetCap: 3000,
+    minProfitFloor: 2000,
+    items: [
+      { name: 'Item 1', cost: 150, price: 300, beauty: 8.0 },
+      { name: 'Item 2', cost: 100, price: 220, beauty: 7.5 },
+    ],
+  },
+  {
+    id: 'clothing',
+    label: 'Clothing',
+    name: 'Clothing',
+    budgetCap: 6000,
+    minProfitFloor: 4500,
+    items: [
+      { name: 'Printed Tee', cost: 220, price: 499, beauty: 8.5 },
+      { name: 'Cotton Kurti', cost: 340, price: 699, beauty: 9.0 },
+      { name: 'Dupatta / Scarf', cost: 140, price: 329, beauty: 8.0 },
+      { name: 'Canvas Tote', cost: 120, price: 279, beauty: 7.5 },
+    ],
+  },
+  {
+    id: 'crafts',
+    label: 'Crafts',
+    name: 'Handmade Crafts',
+    budgetCap: 4000,
+    minProfitFloor: 3200,
+    items: [
+      { name: 'Scented Candle', cost: 130, price: 299, beauty: 9.0 },
+      { name: 'Macrame Keychain', cost: 65, price: 169, beauty: 8.2 },
+      { name: 'Painted Coaster Set', cost: 150, price: 349, beauty: 8.5 },
+      { name: 'Crochet Charm', cost: 90, price: 219, beauty: 8.0 },
+    ],
+  },
+  {
+    id: 'photos',
+    label: 'Photos & Prints',
+    name: 'Photos & Prints',
+    budgetCap: 2500,
+    minProfitFloor: 2200,
+    items: [
+      { name: 'A4 Art Print', cost: 45, price: 149, beauty: 9.0 },
+      { name: 'Polaroid Pack', cost: 55, price: 159, beauty: 8.5 },
+      { name: 'Sticker Sheet', cost: 25, price: 89, beauty: 8.0 },
+      { name: 'Framed Mini Print', cost: 160, price: 379, beauty: 9.2 },
+    ],
+  },
+  {
+    id: 'food',
+    label: 'Food & Treats',
+    name: 'Packaged Food',
+    budgetCap: 3500,
+    minProfitFloor: 2500,
+    items: [
+      { name: 'Brownie Box', cost: 85, price: 199, beauty: 9.0 },
+      { name: 'Cookie Jar', cost: 120, price: 269, beauty: 8.5 },
+      { name: 'Spiced Trail Mix', cost: 70, price: 169, beauty: 7.5 },
+      { name: 'Cold Brew Bottle', cost: 60, price: 149, beauty: 8.0 },
+    ],
+  },
 ];
 
 export const SALE_SCALE_PRESETS = [

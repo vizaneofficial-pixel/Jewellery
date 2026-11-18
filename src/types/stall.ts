@@ -8,6 +8,10 @@ export interface BangleCategory {
   shortName: string;
   cost: number;
   price: number;
+  priceMin?: number | null;
+  priceMax?: number | null;
+  minQty?: number | null;
+  maxQty?: number | null;
   beauty: number;
   barColor: string;
   textClass: string;
@@ -27,6 +31,7 @@ export interface OptimizerConfig {
   minProfitFloor: number;
   maxPerCategory: number;
   minColoursRule: number;
+  conservativeSellThroughPct?: number;
 }
 
 export interface BangleCombo {
@@ -42,6 +47,14 @@ export interface BangleCombo {
   prof100: number;
   rev90: number;
   prof90: number;
+  revMin100?: number;
+  revMax100?: number;
+  profMin100?: number;
+  profMax100?: number;
+  sellThroughPct: number;
+  unsoldRiskCost: number;
+  breakEvenSellThroughPct: number;
+  reason: string;
   pieces: number;
   avgBeauty: number;
   evenness: number;
@@ -58,6 +71,7 @@ export interface StockCategoryGroup {
   minProfitFloor: number;
   maxPerCategory: number;
   minColoursRule: number;
+  conservativeSellThroughPct?: number;
   rules: OptimizerRules;
   categories: BangleCategory[];
   selectedComboId: string | null;
@@ -80,6 +94,15 @@ export interface DiversifiedOverviewTotals {
   totalPieces: number;
   weightedBeauty: number;
   blendedMarginPct: number;
+  weightedConservativeSellThroughPct: number;
+  unsoldInventoryCostConservative: number;
+  totalEventCosts: number;
+  totalOutlay: number;
+  netProfit100AfterCosts: number;
+  netProfitConservativeAfterCosts: number;
+  breakEvenSellThroughPct: number;
+  unitsToBreakEven: number;
+  footfallConversionNeeded: number;
 }
 
 export interface StallStockItem {
@@ -93,6 +116,8 @@ export interface StallStockItem {
   isSyncedBundle: boolean;
   unitPieces?: number;
   groupId?: string;
+  itemType?: 'stock' | 'event_cost';
+  sellThroughManual?: boolean;
 }
 
 export interface StallStockRow extends StallStockItem {
@@ -108,7 +133,10 @@ export interface StallStockRow extends StallStockItem {
 
 export interface StallTotals {
   itemRows: StallStockRow[];
+  eventCostRows: StallStockRow[];
   totalCost: number;
+  otherEventCosts: number;
+  totalEventCosts: number;
   totalOutlay: number;
   rev100: number;
   revRealistic: number;
@@ -116,8 +144,11 @@ export interface StallTotals {
   grossProfitReal: number;
   netAfterStall100: number;
   netAfterStallReal: number;
+  unsoldInventoryCost: number;
+  weightedSellThroughPct: number;
   totalUnits: number;
   breakEvenCoveragePct: number;
+  breakEvenSellThroughPct: number;
   unitsToBreakEven: number;
   footfallConversionNeeded: number;
   blendedMarginPct: number;
@@ -217,12 +248,14 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  preferredName: string;
   photoURL: string;
   businessName: string;
   preferredScale: string;
 }
 
 export interface AccountAiContext {
+  preferredName?: string;
   displayName?: string;
   businessName?: string;
   preferredScale?: string;

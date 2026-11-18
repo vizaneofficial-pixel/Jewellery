@@ -29,6 +29,7 @@ interface HeaderProps {
   onResetAll: () => void;
   onOpenVoiceCoach: () => void;
   onOpenAccountDrawer: () => void;
+  onOpenLoginScreen?: () => void;
 }
 
 const NAV_TABS: Array<{
@@ -59,8 +60,9 @@ export function Header({
   onResetAll,
   onOpenVoiceCoach,
   onOpenAccountDrawer,
+  onOpenLoginScreen,
 }: HeaderProps) {
-  const { user, profile, memories, signingIn, signInWithGoogle } = useAuth();
+  const { user, profile, memories, signingIn, isFirebaseConfigured, signInWithGoogle } = useAuth();
 
   const matchedPreset = SALE_SCALE_PRESETS.find(
     (p) =>
@@ -68,6 +70,10 @@ export function Header({
       p.stallFee === stallFee &&
       p.expectedFootfall === expectedFootfall
   );
+
+  const accountChipLabel = profile
+    ? profile.preferredName || profile.businessName || profile.displayName.split(' ')[0]
+    : '';
 
   return (
     <>
@@ -106,7 +112,7 @@ export function Header({
                   <BrainCircuit className="w-3.5 h-3.5 text-amber-300" />
                 )}
                 <span className="hidden sm:inline max-w-[96px] truncate">
-                  {profile.businessName || profile.displayName.split(' ')[0]}
+                  {accountChipLabel}
                 </span>
                 <span className="font-mono text-[10px] text-amber-300">
                   {memories.length}
@@ -115,14 +121,20 @@ export function Header({
             ) : (
               <button
                 type="button"
-                onClick={signInWithGoogle}
+                onClick={() => {
+                  if (!isFirebaseConfigured && onOpenLoginScreen) {
+                    onOpenLoginScreen();
+                  } else {
+                    void signInWithGoogle();
+                  }
+                }}
                 disabled={signingIn}
                 aria-label="Sign in with Google"
                 className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 whitespace-nowrap shrink-0 transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-amber-400"
               >
                 <LogIn className="w-3.5 h-3.5 text-amber-300" />
                 <span className="hidden sm:inline">
-                  {signingIn ? 'Signing in...' : 'Google Sign-In'}
+                  {signingIn ? 'Signing in...' : 'Sign In'}
                 </span>
                 <span className="sm:hidden">{signingIn ? '...' : 'Sign In'}</span>
               </button>
@@ -141,7 +153,7 @@ export function Header({
           {/* Zone 2: 4 Concise Single-Line Navigation Tabs */}
           <nav
             aria-label="Primary Workspace"
-            className="order-3 sm:order-2 w-full sm:w-auto flex items-center justify-between sm:justify-center gap-1 sm:gap-1.5 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/60"
+            className="order-3 sm:order-2 w-full sm:w-auto grid grid-cols-4 sm:flex items-center sm:justify-center gap-1 sm:gap-1.5 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/60"
           >
             {NAV_TABS.map((t) => {
               const Icon = t.icon;
@@ -153,14 +165,14 @@ export function Header({
                   role="tab"
                   aria-selected={active}
                   onClick={() => onTabChange(t.id)}
-                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors focus-visible:outline-2 focus-visible:outline-amber-400 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap min-w-0 transition-colors focus-visible:outline-2 focus-visible:outline-amber-400 ${
                     active
                       ? 'bg-amber-400 text-slate-950'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="sm:hidden">{t.mobileLabel}</span>
+                  <Icon className="w-3.5 h-3.5 shrink-0 hidden sm:inline" />
+                  <span className="sm:hidden truncate">{t.mobileLabel}</span>
                   <span className="hidden sm:inline">{t.label}</span>
                 </button>
               );
