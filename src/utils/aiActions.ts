@@ -1,4 +1,4 @@
-import { EXTRA_CATEGORY_STYLES, INITIAL_CATEGORIES } from '../data/defaults';
+import { EXTRA_CATEGORY_STYLES, INITIAL_CATEGORIES } from '../data/defaults.js';
 import type {
   AccountAiContext,
   AiMemoryAddition,
@@ -16,7 +16,7 @@ import {
   generateBangleCombinations,
   resolveCategoryGroups,
   syncCategoryGroupsToStallStock,
-} from './optimizer';
+} from './optimizer.js';
 
 const VALID_MEMORY_CATEGORIES = new Set<AiMemoryCategory>([
   'inventory',
