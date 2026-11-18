@@ -1,11 +1,14 @@
 import type {
   BangleCategory,
   BangleCombo,
+  CategoryGroupResolved,
+  DiversifiedOverviewTotals,
   LocalParseResult,
   OptimizerConfig,
   OptimizerRules,
   StallStockItem,
   StallTotals,
+  StockCategoryGroup,
 } from '../types/stall';
 
 const BADGE_STYLE_BY_TYPE: Record<string, string> = {
@@ -628,3 +631,119 @@ export function parseLocalRawCommand(
 
   return result;
 }
+
+export function resolveCategoryGroups(groups: StockCategoryGroup[]): CategoryGroupResolved[] {
+  return groups.map((group) => {
+    const combos = generateBangleCombinations(
+      group.categories,
+      {
+        budgetCap: group.budgetCap,
+        minProfitFloor: group.minProfitFloor,
+        maxPerCategory: group.maxPerCategory,
+        minColoursRule: group.minColoursRule,
+      },
+      group.rules
+    );
+    const base =
+      combos.find((c) => c.id === group.selectedComboId) || combos[0] || null;
+    const activeCombo =
+      base &&
+      group.customQuantities &&
+      group.customQuantities.length === group.categories.length
+        ? applyCustomQuantities(
+            base,
+            group.customQuantities,
+            group.categories,
+            group.minProfitFloor
+          )
+        : base;
+
+    return {
+      group,
+      combos,
+      activeCombo,
+    };
+  });
+}
+
+export function computeDiversifiedOverviewTotals(
+  resolvedGroups: CategoryGroupResolved[]
+): DiversifiedOverviewTotals {
+  let totalAllocatedBudget = 0;
+  let totalInvestment = 0;
+  let totalRevenue100 = 0;
+  let totalRevenue90 = 0;
+  let totalProfit100 = 0;
+  let totalProfit90 = 0;
+  let totalPieces = 0;
+  let weightedBeautySum = 0;
+
+  resolvedGroups.forEach(({ group, activeCombo }) => {
+    totalAllocatedBudget += group.budgetCap;
+    if (!activeCombo) return;
+    totalInvestment += activeCombo.cost;
+    totalRevenue100 += activeCombo.rev100;
+    totalRevenue90 += activeCombo.rev90;
+    totalProfit100 += activeCombo.prof100;
+    totalProfit90 += activeCombo.prof90;
+    totalPieces += activeCombo.pieces;
+    weightedBeautySum += activeCombo.avgBeauty * activeCombo.pieces;
+  });
+
+  const weightedBeauty =
+    totalPieces > 0 ? Number((weightedBeautySum / totalPieces).toFixed(2)) : 0;
+  const blendedMarginPct =
+    totalRevenue100 > 0
+      ? Number(((totalProfit100 / totalRevenue100) * 100).toFixed(1))
+      : 0;
+
+  return {
+    totalAllocatedBudget,
+    totalInvestment,
+    totalRevenue100,
+    totalRevenue90,
+    totalProfit100,
+    totalProfit90,
+    totalPieces,
+    weightedBeauty,
+    blendedMarginPct,
+  };
+}
+
+export function syncCategoryGroupsToStallStock(
+  resolvedGroups: CategoryGroupResolved[],
+  existingStock: StallStockItem[],
+  globalSellThrough = 90
+): StallStockItem[] {
+  const existingBundlesByGroup = new Map<string, StallStockItem>();
+  existingStock.forEach((item) => {
+    if (item.isSyncedBundle && item.groupId) {
+      existingBundlesByGroup.set(item.groupId, item);
+    } else if (item.isSyncedBundle && item.id === 's_bangles') {
+      existingBundlesByGroup.set('grp_bangles', item);
+    }
+  });
+
+  const syncedRows: StallStockItem[] = resolvedGroups
+    .filter((rg) => rg.activeCombo !== null)
+    .map(({ group, activeCombo }) => {
+      const prev = existingBundlesByGroup.get(group.id);
+      const combo = activeCombo!;
+      return {
+        id: prev?.id || `sync_${group.id}`,
+        name: `${group.name} Mix (${combo.label} · ${combo.pieces} pcs)`,
+        category: group.name,
+        cost: combo.cost,
+        price: combo.rev100,
+        qty: prev ? Math.max(1, prev.qty) : 1,
+        sellThrough: prev ? prev.sellThrough : globalSellThrough,
+        isSyncedBundle: true,
+        unitPieces: combo.pieces,
+        groupId: group.id,
+      };
+    });
+
+  const manualRows = existingStock.filter((item) => !item.isSyncedBundle);
+  return [...syncedRows, ...manualRows];
+}
+

@@ -278,10 +278,10 @@ export function CalculatorTab({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-sm font-bold text-white">
-              Total Stall Stock Ledger {activeCombo ? `· Synced with Bangle Mix ${activeCombo.label}` : ''}
+              Total Stall Stock Ledger · Synced with All Category Mixes
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Adjust unit cost, selling price, quantity, and realistic sell-through % per line item.
+              Includes your preferred choice from every stock category plus individual items.
             </p>
           </div>
 

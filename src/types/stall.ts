@@ -1,4 +1,4 @@
-export type AppTab = 'optimizer' | 'calculator' | 'strategies';
+export type AppTab = 'optimizer' | 'calculator' | 'strategies' | 'overview';
 
 export type ZoneId = 'front_left' | 'center_tray' | 'right_mirror' | 'back_riser';
 
@@ -50,6 +50,38 @@ export interface BangleCombo {
   isCustom?: boolean;
 }
 
+export interface StockCategoryGroup {
+  id: string;
+  name: string;
+  accentColor: string;
+  budgetCap: number;
+  minProfitFloor: number;
+  maxPerCategory: number;
+  minColoursRule: number;
+  rules: OptimizerRules;
+  categories: BangleCategory[];
+  selectedComboId: string | null;
+  customQuantities: number[] | null;
+}
+
+export interface CategoryGroupResolved {
+  group: StockCategoryGroup;
+  combos: BangleCombo[];
+  activeCombo: BangleCombo | null;
+}
+
+export interface DiversifiedOverviewTotals {
+  totalAllocatedBudget: number;
+  totalInvestment: number;
+  totalRevenue100: number;
+  totalRevenue90: number;
+  totalProfit100: number;
+  totalProfit90: number;
+  totalPieces: number;
+  weightedBeauty: number;
+  blendedMarginPct: number;
+}
+
 export interface StallStockItem {
   id: string;
   name: string;
@@ -60,6 +92,7 @@ export interface StallStockItem {
   sellThrough: number;
   isSyncedBundle: boolean;
   unitPieces?: number;
+  groupId?: string;
 }
 
 export interface StallStockRow extends StallStockItem {
@@ -148,6 +181,8 @@ export interface PlannerSnapshot {
   customQuantities: number[] | null;
   stallStock: StallStockItem[];
   activeTab: AppTab;
+  categoryGroups?: StockCategoryGroup[];
+  activeGroupId?: string;
 }
 
 export interface SaleScalePreset {
@@ -193,4 +228,3 @@ export interface AccountAiContext {
   preferredScale?: string;
   memories: Array<{ fact: string; category: string }>;
 }
-

@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { INITIAL_CATEGORIES, INITIAL_STALL_STOCK } from '../data/defaults';
+import { INITIAL_CATEGORIES, INITIAL_CATEGORY_GROUPS, INITIAL_STALL_STOCK } from '../data/defaults';
 import {
   applyCustomQuantities,
   calculateStallTotals,
+  computeDiversifiedOverviewTotals,
   generateBangleCombinations,
   parseLocalRawCommand,
+  resolveCategoryGroups,
+  syncCategoryGroupsToStallStock,
 } from './optimizer';
 
 test('generateBangleCombinations respects budgetCap, minProfitFloor, and allAtLeastOne', () => {
@@ -224,3 +227,32 @@ test('applyAiToolAction configures entire website from dictated items, costs, be
   assert.equal(updatedSynced?.qty, 3);
   assert.ok(lotUpdate.stallTotals.totalUnits > result.stallTotals.totalUnits);
 });
+
+test('resolveCategoryGroups, computeDiversifiedOverviewTotals, and syncCategoryGroupsToStallStock handle multi-category portfolios', () => {
+  const resolved = resolveCategoryGroups(INITIAL_CATEGORY_GROUPS);
+  assert.equal(resolved.length, 3, 'Should resolve all 3 default category groups');
+
+  resolved.forEach(({ group, combos, activeCombo }) => {
+    assert.ok(combos.length > 0 && combos.length <= 15, `${group.name} should generate up to 15 combinations`);
+    assert.ok(activeCombo !== null, `${group.name} should have an active preferred combination`);
+    assert.ok(activeCombo!.cost <= group.budgetCap, `${group.name} active combo should respect its budgetCap`);
+  });
+
+  const overview = computeDiversifiedOverviewTotals(resolved);
+  assert.equal(overview.totalAllocatedBudget, 11000, '3000 + 6000 + 2000 = 11000 total budget');
+  assert.ok(overview.totalInvestment > 9000 && overview.totalInvestment <= 11000);
+  assert.ok(overview.totalProfit100 > 11000);
+  assert.ok(overview.totalPieces > 30);
+  assert.ok(overview.weightedBeauty >= 7.5);
+
+  const manualItems = INITIAL_STALL_STOCK.filter((s) => !s.isSyncedBundle);
+  const syncedStock = syncCategoryGroupsToStallStock(resolved, manualItems, 90);
+  const syncedBundles = syncedStock.filter((s) => s.isSyncedBundle);
+  assert.equal(syncedBundles.length, 3, 'Should create 1 synced bundle row per category group');
+  assert.equal(
+    syncedBundles.reduce((sum, b) => sum + b.cost, 0),
+    overview.totalInvestment,
+    'Sum of synced bundle costs in Total Stall CFO must match Stock Overview total investment'
+  );
+});
+
