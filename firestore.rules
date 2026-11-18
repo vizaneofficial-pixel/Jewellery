@@ -1,0 +1,216 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasParentUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+        get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+    }
+
+    // Entity Validation Blueprints
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+        'uid', 'email', 'displayName', 'photoURL',
+        'businessName', 'preferredScale', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'uid', 'email', 'displayName', 'photoURL',
+        'businessName', 'preferredScale', 'createdAt', 'updatedAt'
+      ]) &&
+      data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+      data.uid == userId && data.uid == request.auth.uid &&
+      data.email is string && data.email.size() <= 254 &&
+      data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+      data.photoURL is string && data.photoURL.size() <= 512 &&
+      data.businessName is string && data.businessName.size() <= 120 &&
+      data.preferredScale is string && data.preferredScale.size() <= 60 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidStallWorkspace(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'eventName', 'expectedFootfall', 'budgetCap', 'minProfitFloor',
+        'stallFee', 'maxPerCategory', 'minColoursRule', 'globalSellThrough',
+        'activeTab', 'rules', 'categories', 'stallStock',
+        'selectedComboId', 'customQuantities', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'ownerId', 'eventName', 'expectedFootfall', 'budgetCap', 'minProfitFloor',
+        'stallFee', 'maxPerCategory', 'minColoursRule', 'globalSellThrough',
+        'activeTab', 'rules', 'categories', 'stallStock',
+        'selectedComboId', 'customQuantities', 'createdAt', 'updatedAt'
+      ]) &&
+      data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+      data.ownerId == userId && data.ownerId == request.auth.uid &&
+      data.eventName is string && data.eventName.size() >= 1 && data.eventName.size() <= 120 &&
+      data.expectedFootfall is number && data.expectedFootfall >= 10 && data.expectedFootfall <= 10000000 &&
+      data.budgetCap is number && data.budgetCap >= 100 && data.budgetCap <= 100000000 &&
+      data.minProfitFloor is number && data.minProfitFloor >= 0 && data.minProfitFloor <= 100000000 &&
+      data.stallFee is number && data.stallFee >= 0 && data.stallFee <= 100000000 &&
+      data.maxPerCategory is number && data.maxPerCategory >= 1 && data.maxPerCategory <= 500 &&
+      data.minColoursRule is number && data.minColoursRule >= 0 && data.minColoursRule <= 25 &&
+      data.globalSellThrough is number && data.globalSellThrough >= 10 && data.globalSellThrough <= 100 &&
+      data.activeTab is string && data.activeTab.size() <= 20 &&
+      data.activeTab in ['optimizer', 'calculator', 'strategies'] &&
+      data.rules is map &&
+      data.rules.keys().hasAll(['allAtLeastOne', 'evenDistribution', 'beautyFirst', 'maxProfitFocus', 'safe90Mode']) &&
+      data.rules.keys().hasOnly(['allAtLeastOne', 'evenDistribution', 'beautyFirst', 'maxProfitFocus', 'safe90Mode']) &&
+      data.rules.allAtLeastOne is bool &&
+      data.rules.evenDistribution is bool &&
+      data.rules.beautyFirst is bool &&
+      data.rules.maxProfitFocus is bool &&
+      data.rules.safe90Mode is bool &&
+      data.categories is list && data.categories.size() >= 1 && data.categories.size() <= 25 &&
+      data.categories[0] is map &&
+      data.stallStock is list && data.stallStock.size() <= 60 &&
+      (data.stallStock.size() == 0 || data.stallStock[0] is map) &&
+      (data.selectedComboId == null || (data.selectedComboId is string && data.selectedComboId.size() <= 128)) &&
+      (data.customQuantities == null || (data.customQuantities is list && data.customQuantities.size() <= 25 && (data.customQuantities.size() == 0 || data.customQuantities[0] is number))) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidAiMemoryEntry(data, userId) {
+      return data.keys().hasAll(['ownerId', 'fact', 'category', 'source', 'createdAt', 'updatedAt']) &&
+      data.keys().hasOnly(['ownerId', 'fact', 'category', 'source', 'createdAt', 'updatedAt']) &&
+      data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+      data.ownerId == userId && data.ownerId == request.auth.uid &&
+      data.fact is string && data.fact.size() >= 2 && data.fact.size() <= 500 &&
+      data.category is string && data.category.size() <= 30 &&
+      data.category in ['inventory', 'pricing', 'event', 'preference', 'strategy'] &&
+      data.source is string && data.source.size() <= 20 &&
+      data.source in ['voice', 'command', 'manual'] &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // Merchant Account Profile (PII strictly owner-isolated)
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && isOwner(userId);
+      allow list: if false;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          // Action: Sync Google Auth identity fields
+          incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'updatedAt']) ||
+          // Action: Update merchant business profile preferences
+          incoming().diff(existing()).affectedKeys().hasOnly(['businessName', 'preferredScale', 'updatedAt'])
+        );
+
+      allow delete: if false;
+
+      // Saved Stall Workspaces (Master Gate on parent user doc)
+      match /workspaces/{workspaceId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(workspaceId) && isOwner(userId);
+        allow list: if isSignedIn() && isValidId(userId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(workspaceId) &&
+          isOwner(userId) &&
+          isValidStallWorkspace(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasParentUser(userId);
+
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(workspaceId) &&
+          isOwner(userId) &&
+          isValidStallWorkspace(incoming(), userId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'eventName', 'expectedFootfall', 'budgetCap', 'minProfitFloor',
+            'stallFee', 'maxPerCategory', 'minColoursRule', 'globalSellThrough',
+            'activeTab', 'rules', 'categories', 'stallStock',
+            'selectedComboId', 'customQuantities', 'updatedAt'
+          ]) &&
+          hasParentUser(userId);
+
+        allow delete: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(workspaceId) &&
+          isOwner(userId) &&
+          hasParentUser(userId);
+      }
+
+      // Account-Scoped AI Memory Entries (Master Gate on parent user doc)
+      match /aiMemories/{memoryId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(memoryId) && isOwner(userId);
+        allow list: if isSignedIn() && isValidId(userId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(memoryId) &&
+          isOwner(userId) &&
+          isValidAiMemoryEntry(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasParentUser(userId);
+
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(memoryId) &&
+          isOwner(userId) &&
+          isValidAiMemoryEntry(incoming(), userId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['fact', 'category', 'updatedAt']) &&
+          hasParentUser(userId);
+
+        allow delete: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(memoryId) &&
+          isOwner(userId) &&
+          hasParentUser(userId);
+      }
+    }
+  }
+}
