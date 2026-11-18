@@ -7,7 +7,7 @@ import {
   handleSearchStrategies,
   handleStrategyPitch,
   handleVoiceTurn,
-} from '../../src/server/aiHandlers';
+} from '../../src/server/aiHandlers.js';
 
 interface VercelReq extends IncomingMessage {
   method?: string;
